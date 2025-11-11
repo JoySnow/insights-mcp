@@ -11,6 +11,7 @@ from typing import Any
 import requests
 import uvicorn
 from fastmcp import FastMCP
+from fastmcp.server.auth.oidc_proxy import OIDCProxy
 from mcp.types import ToolAnnotations
 
 from advisor_mcp.server import mcp_server as AdvisorMCP
@@ -81,6 +82,19 @@ def _format_all_tool_descriptions(
         _format_server_tools(mcp, format_kwargs=format_kwargs)
 
 
+def _init_oauth(self, oauth_enabled=True):
+    auth = None
+    if oauth_enabled:
+        # Simple OIDC based protection
+        auth = OIDCProxy(
+            config_url="https://sso.redhat.com/auth/realms/redhat-external/.well-known/openid-configuration",
+            client_id=os.getenv("FASTMCP_SERVER_AUTH_SSO_CLIENT_ID"),
+            client_secret=os.getenv("FASTMCP_SERVER_AUTH_SSO_CLIENT_SECRET"),
+            base_url="http://localhost:8000",
+        )
+    return auth
+
+
 class InsightsMCPServer(FastMCP):  # pylint: disable=too-many-instance-attributes
     """Unified MCP server that mounts multiple Red Hat Insights service servers.
 
@@ -120,6 +134,8 @@ class InsightsMCPServer(FastMCP):  # pylint: disable=too-many-instance-attribute
         super().__init__(
             name=name,
             instructions=instructions,
+            debug=True,
+            auth=_init_oauth(oauth_enabled),
             **settings,
         )
         self.base_url = base_url
@@ -360,6 +376,7 @@ def main():  # pylint: disable=too-many-statements,too-many-locals
     proxy_url = os.getenv("INSIGHTS_PROXY_URL", os.getenv("LIGHTSPEED_PROXY_URL"))
 
     logger = logging.getLogger("InsightsMCPServer")
+    logger.debug("Using arguments: %s", args)
 
     if args.debug:  # FIXME: make common logging setup
         # Configure root logger for debug output
@@ -374,6 +391,8 @@ def main():  # pylint: disable=too-many-statements,too-many-locals
         logger.info("Debug mode enabled")
 
     oauth_enabled = os.getenv("OAUTH_ENABLED", "false").lower() == "true"
+    logger.debug("Using argument: oauth_enabled: %s", oauth_enabled)
+    logger.debug("Using argument: proxy_url: %s", proxy_url)
     toolset = args.toolset or os.getenv("INSIGHTS_TOOLSET") or os.getenv("LIGHTSPEED_TOOLSET") or "all"
 
     if toolset == "all":
@@ -424,32 +443,9 @@ def main():  # pylint: disable=too-many-statements,too-many-locals
     if args.transport == "sse":
         mcp_server.run(transport="sse", host=args.host, port=args.port)
     elif args.transport == "http":
-        if oauth_enabled:
-            app = mcp_server.http_app(transport="http")
-            self_url = os.getenv(
-                "SELF_URL",
-                f"http://{args.host}:{args.port}",
-            )
-            oauth_url = os.getenv(
-                "OAUTH_URL",
-                "https://sso.redhat.com/auth/realms/redhat-external",
-            )
-            oauth_client = os.getenv("OAUTH_CLIENT")
-            if not oauth_client:
-                logger.fatal("OAUTH_CLIENT environment variable is required for OAuth-enabled HTTP transport")
-                sys.exit(1)
-
-            app.add_middleware(
-                Middleware,
-                self_url=self_url,
-                oauth_url=oauth_url,
-                oauth_client=oauth_client,
-            )
-
-            # Start the application
-            uvicorn.run(app, host=args.host, port=args.port)
-        else:
-            mcp_server.run(transport="http", host=args.host, port=args.port)
+        # Force overrided the host:port for initial auth feat adding
+        # mcp_server.run(transport="http", host=args.host, port=args.port)
+        mcp_server.run(transport="http", host="localhost", port=8000)
     else:
         mcp_server.run()
 
