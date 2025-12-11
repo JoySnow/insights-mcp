@@ -458,11 +458,12 @@ def main():  # pylint: disable=too-many-statements,too-many-locals
     instructions = instructions_template.safe_substitute(container_brand_long=container_brand_long)
     mcp_server_config["instructions"] = instructions
 
-    # Note: Force overrided the host:port to a SSO registered host:port
+    # Note: Force overrided the host:port to a SSO registered host:port if not authorized
     mcp_server_config["mcp_host"] = args.host
     mcp_server_config["mcp_port"] = args.port
     log_level = "DEBUG" if args.debug else "WARNING"
-    if mcp_server_config["oauth_enabled"]:
+    if (mcp_server_config["oauth_enabled"] and
+        (args.host, args.port) not in config.SSO_AUTHORIZED_MCP_SERVER_HOST_PORTS):
         mcp_server_config["mcp_host"] = "localhost"
         mcp_server_config["mcp_port"] = 8000
         logger.info(
@@ -472,6 +473,7 @@ def main():  # pylint: disable=too-many-statements,too-many-locals
         )
         logger.info(">>> The origin passed in host:port: %s:%s", args.host, args.port)
         logger.info(">>> Note: For SSO authentication, you need to register the mcp server host:port with SSO")
+        logger.info(">>> Allowed host:port combinations are: %s", config.SSO_AUTHORIZED_MCP_SERVER_HOST_PORTS)
 
     # Create and run the MCP server
     mcp_server = InsightsMCPServer(**mcp_server_config)
