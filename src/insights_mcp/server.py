@@ -265,7 +265,8 @@ def setup_credentials(mcp_server_config: dict, logger: logging.Logger) -> None:
         })
         if not all(mcp_server_config.get(k) for k in ("client_id", "client_secret")):
             logger.error("SSO Client ID and secret are required for SSO OAuth authentication")
-            sys.exit(1)
+            # Don't exit the program to allow the user to continue using the server without credentials
+            # sys.exit(1)
         logger.info("Using SSO Client ID: %s", mcp_server_config["client_id"])
     else:
         # Traditional mode - use service account credentials
@@ -277,7 +278,8 @@ def setup_credentials(mcp_server_config: dict, logger: logging.Logger) -> None:
         })
         if not any(mcp_server_config.get(k) for k in ("client_id", "client_secret", "refresh_token")):
             logger.error("Service account credentials are required for Insights authentication")
-            sys.exit(1)
+            # Don't exit the program to allow the user to continue using the server without credentials
+            # sys.exit(1)
         logger.info("Using Insights Client ID: %s", mcp_server_config["client_id"])
 
 
