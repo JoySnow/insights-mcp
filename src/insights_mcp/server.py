@@ -2,6 +2,8 @@
 
 import argparse
 import asyncio
+import base64
+import importlib.resources
 import logging
 import sys
 from string import Template
@@ -9,7 +11,7 @@ from typing import Any
 
 import requests
 from fastmcp import FastMCP
-from mcp.types import ToolAnnotations
+from mcp.types import Icon, ToolAnnotations
 
 from advisor_mcp.server import mcp_server as AdvisorMCP
 from content_sources_mcp.server import mcp as ContentSourcesMCP
@@ -75,6 +77,13 @@ def _format_all_tool_descriptions(
         _format_server_tools(mcp, format_kwargs=format_kwargs)
 
 
+def get_icon_data_uri() -> str:
+    """Load the package icon as a base64 data URI for consent screen branding."""
+    icon_data = importlib.resources.files("insights_mcp.assets").joinpath("icon.png").read_bytes()
+    icon_b64 = base64.b64encode(icon_data).decode("utf-8")
+    return f"data:image/png;base64,{icon_b64}"
+
+
 class InsightsMCPServer(FastMCP):  # pylint: disable=too-many-instance-attributes
     """Unified MCP server that mounts multiple Red Hat Insights service servers.
 
@@ -133,6 +142,8 @@ class InsightsMCPServer(FastMCP):  # pylint: disable=too-many-instance-attribute
             name=name,
             instructions=instructions,
             auth=oauth_provider,
+            icons=[Icon(src=get_icon_data_uri())],
+            website_url="https://console.redhat.com",
             **settings,
         )
         self.base_url = base_url
