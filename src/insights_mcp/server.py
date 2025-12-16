@@ -5,6 +5,7 @@ import asyncio
 import base64
 import importlib.resources
 import logging
+import os
 import sys
 from string import Template
 from typing import Any
